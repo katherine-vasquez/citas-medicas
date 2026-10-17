@@ -1,0 +1,71 @@
+# Orquestación del sistema de citas médicas
+#   - db:            MySQL 8 (imagen oficial) con volumen persistente
+#   - backend:       API REST (imagen propia, publicada en Docker Hub)
+#   - notifications: microservicio de notificaciones (imagen propia, publicada en Docker Hub)
+#
+# Las credenciales se leen del archivo .env (copiar .env.example → .env). Nunca se suben a GitHub.
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: citas-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql          # persistencia de los datos
+    expose:
+      - "3306"                             # solo visible dentro de la red interna
+    healthcheck:                           # verificación de disponibilidad de la BD
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - citas-net
+
+  notifications:
+    image: ${DOCKERHUB_USERNAME}/citas-notifications:${IMAGE_TAG:-latest}
+    build: ./notifications
+    container_name: citas-notifications
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+    ports:
+      - "4000:4000"
+    networks:
+      - citas-net
+
+  backend:
+    image: ${DOCKERHUB_USERNAME}/citas-backend:${IMAGE_TAG:-latest}
+    build: ./backend
+    container_name: citas-backend
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      # "db" es el nombre del servicio: Docker Compose lo resuelve por la red interna
+      DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE}
+      NOTIFICATIONS_URL: http://notifications:4000
+      DB_MAX_RETRIES: 10
+      DB_RETRY_DELAY_SECONDS: 3
+      SEED_ON_START: "true"
+    ports:
+      - "3000:3000"                        # publica la API en el puerto 3000 del host
+    depends_on:
+      db:
+        condition: service_healthy         # espera a que MySQL esté listo
+      notifications:
+        condition: service_started
+    networks:
+      - citas-net
+
+volumes:
+  mysql_data:
+
+networks:
+  citas-net:
+    driver: bridge

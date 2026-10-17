@@ -1,0 +1,60 @@
+// schema.prisma — modelo de datos del sistema de citas médicas
+// Base de datos: MySQL. Prisma Client se genera a partir de este archivo.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppointmentStatus {
+  PENDIENTE
+  CONFIRMADA
+  ATENDIDA
+  CANCELADA
+}
+
+model Patient {
+  id           Int           @id @default(autoincrement())
+  fullName     String        @db.VarChar(120)
+  document     String        @unique @db.VarChar(20)
+  email        String        @unique @db.VarChar(120)
+  phone        String        @db.VarChar(20)
+  createdAt    DateTime      @default(now())
+  appointments Appointment[]
+
+  @@map("patients")
+}
+
+model Doctor {
+  id           Int           @id @default(autoincrement())
+  fullName     String        @db.VarChar(120)
+  specialty    String        @db.VarChar(80)
+  email        String        @unique @db.VarChar(120)
+  createdAt    DateTime      @default(now())
+  appointments Appointment[]
+
+  @@map("doctors")
+}
+
+model Appointment {
+  id        Int               @id @default(autoincrement())
+  patientId Int
+  doctorId  Int
+  dateTime  DateTime
+  reason    String            @db.VarChar(255)
+  status    AppointmentStatus @default(PENDIENTE)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id])
+  doctor  Doctor  @relation(fields: [doctorId], references: [id])
+
+  @@index([doctorId, dateTime])
+  @@index([patientId])
+  @@map("appointments")
+}

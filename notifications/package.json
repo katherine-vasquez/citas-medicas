@@ -1,0 +1,11 @@
+{
+  "name": "citas-medicas-notifications",
+  "version": "1.0.0",
+  "description": "Microservicio de notificaciones de citas médicas",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --check src/server.js"
+  },
+  "license": "MIT"
+}
